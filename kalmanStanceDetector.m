@@ -5,6 +5,7 @@ function [pSmoothed,pUpdated,pPredicted,BW]=kalmanStanceDetector(force1,force2)
 BW=nanmean(force1+force2); %Median has better outlier rejection, but very skewed distributions may make it not a good estimator of weight (newton says mean(force in z direction) = weight because we are not floating away!
 N=length(force1);
 M=100; %Number of points where we estimate the probability distribution in the interval [-1 1]
+D=100; %Number of points where we estimate the probability distribution of the output 
 yObs=[force1 force2]/BW; %We have two observations that roughly will sum to 0, and both components are roughly always in [-1 1]
 %yObs=(force1-force2)/BW;
 %Alt idea: normalize the observations so that they sum to 1 on each point
@@ -17,55 +18,37 @@ yObs=[force1 force2]/BW; %We have two observations that roughly will sum to 0, a
 %for x=1/2 and 0.98 for x=+-1, with a quadratic shape.
 aux=linspace(-1, 1,M);
 Dx=aux' - aux;
-sigma=.05;
+sigma=.01;
 pStateGivenPrevious=exp(-Dx.^2 ./ ((2*(1-abs(aux))+1)*sigma).^2); %Transition matrix
 %pStateGivenPrevious=columnNormalize(pStateGivenPrevious);
 pStateGivenPrevious=pStateGivenPrevious./sum(pStateGivenPrevious,1);
 %Add higher chance of staying in place for -1 and 1 (point attractors)
-w=.95; %This could be estimated from data. Should roughly be 2*sampling period/stride period.
+w=.9; %This could be estimated from data. Should roughly be 2*sampling period/stride period.
 pStateGivenPrevious(1,1)=w+(1-w)*pStateGivenPrevious(1,1);
 pStateGivenPrevious(M,M)=w+(1-w)*pStateGivenPrevious(M,M);
 
+%Observation probability distribution:
+measNoiseSigma=.03;
+aux=[0:D-1]'/(D-1) - [0:M-1]/(M-1);
+pObsGivenState=exp(-(aux.^2)/(2*measNoiseSigma^2))/sqrt(2*pi*measNoiseSigma^2);
+pObsGivenState(:,1)= [.9; zeros(D-1,1)] + .1*pObsGivenState(:,1);%If state=1, then with high likelihood we observe 1
+pObsGivenState(:,M)= [zeros(D-1,1);.9] + .1*pObsGivenState(:,M);%If state=1, then with high likelihood we observe 1
 
-%Forward pass (Kalman filter)
+
+
+
+
 p0=ones(1,M)/M;
-pPredicted=nan(N+1,M); %We can predict up to the Nth+1 sample
-pPredicted(1,:)=p0;
-pUpdated=nan(N,M);
-for i=1:N
-   %Update:
-   pUpdated(i,:)=normalize(pObsGivenState(yObs(i,:),M).*pPredicted(i,:));
-   %Predict:
-   pPredicted(i+1,:)=sum(pStateGivenPrevious .* pUpdated(i,:),2)';
-end
+observation=-diff(yObs,[],2)./abs(sum(yObs,2));
+%observation(yObs(1,:)==0)=1; %Assuming not both at 0 at the same time, ever
+%observation(yObs(2,:)==0)=-1;
+observation=round((D-1)*(observation+1)/2)+1; %Quantizing observations to [1,D] range
+[pPredicted, pUpdated, pSmoothed] = genKFstationaryInference(observation,pObsGivenState,pStateGivenPrevious,p0);
 
-%Backward pass (Smoothing)
-pSmoothed=nan(N,M);
-pSmoothed(N,:)=pUpdated(N,:);
-for i=(N-1):-1:1
-    pSmoothed(i,:)=pUpdated(i,:) .* sum(pStateGivenPrevious .*(pSmoothed(i+1,:)./pPredicted(i+1,:))',1);
-end
 
+figure; subplot(1,2,2); imagesc(pStateGivenPrevious); title('Transition'); ylabel('Next state'); xlabel('Curr state'); subplot(1,2,1); imagesc(pObsGivenState); title('Observation');  ylabel('Obs'); xlabel('State');
 end
 
 function p=normalize(p)
     p=p/sum(p(:));
-end
-
-function p=columnNormalize(p)
-    p=p./sum(p,1);
-end
-
-function p=pObsGivenState(yObs,M)
-%This is counter-intuitive: it computes the probability of an observation
-%given a state, but does so as a function of the observation (which we
-%have) and the unknown is the state
-if any(yObs==0) %One of the measurements is 0: then the state is almost surely [1,0] or [0,1]
-    aux=-sign(diff(yObs))-linspace(-1,1,M);
-    p=1./(aux+1e-5);
-else %None of the measurements is 0: use the difference to assign.
-    aux=-diff(yObs)/abs(sum(yObs))-linspace(-1,1,M);
-    sigma=.05;
-    p=normalize(exp(-(aux.^2/sigma^2)) +1/(M*abs(diff(yObs))));
-end
 end
