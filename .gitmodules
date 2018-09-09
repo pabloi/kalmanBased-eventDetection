@@ -1,0 +1,3 @@
+[submodule "matlab-linsys"]
+	path = matlab-linsys
+	url = www.github.com/pabloi/matlab-linsys
