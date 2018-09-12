@@ -1,9 +1,9 @@
-function [pSmoothed,pUpdated,pPredicted,pStateGivenPrevious,pObsGivenState]=kalmanStanceDetector(force1,force2)
+function [pSmoothed,pUpdated,pPredicted,pStateGivenPrevious,pObsGivenState]=kalmanStanceDetectorv2(force1,force2)
 %This function implements a kalman-style filter (hidden markov chain state
 %estimation) to infer stance from force traces.
 
-M=101; %Number of points where we estimate the probability distribution in the interval [-1 1]
-D=99; %Number of points where we estimate the probability distribution of the output 
+M=51; %Number of points where we estimate the probability distribution in the interval [-1 1]
+D=100; %Number of points where we estimate the probability distribution of the output 
 
 %HMM chain description:
 %The transition probability is: with probability=w we transition to a new
@@ -26,7 +26,14 @@ pStateGivenPrevious(:,M)=[zeros(M-2,1);1-w;w];
 %Also, make it hard to enter, as the probabilities are symmetric:
 pStateGivenPrevious(1,:)=pStateGivenPrevious(:,1)';
 pStateGivenPrevious(M,:)=pStateGivenPrevious(:,M)';
-pStateGivenPrevious=columnNormalize(pStateGivenPrevious);
+
+%Introduce histeresis:
+L=tril(pStateGivenPrevious);
+T=nan(2*M-2);
+T(1:M,:)=[L(:,1:M-1),[L(end,1:M-1);zeros(M-1)]];
+T(M:end,:)=[[L(end,1:M-1);zeros(M-2,M-1);],L(1:M-1,1:M-1)];
+T=sparse(T);
+T=columnNormalize(T);
 
 %Observation probability distribution:
 measNoiseSigma=.03;
@@ -41,17 +48,15 @@ pp=.05; %Prob of observing non-zero force in the single-stance phase
 pObsGivenState(:,1)=[1-pp;pp/3;pp/3;pp/3;zeros(D-4,1)];
 pObsGivenState(:,M)=[zeros(D-4,1);pp/3;pp/3;pp/3;1-pp];
 
+O=[pObsGivenState(:,1:M-1),fliplr(pObsGivenState(:,2:M))];
+O=sparse(O);
+O=columnNormalize(O);
 
-
-
-
-
-
-p0=ones(M,1)/M;
+p0=ones(1,2*M-2)/(2*M-2);
 observation=discretizeObs((force2-force1)./abs(force2+force1),D,[-1 1]);
-[pPredicted, pUpdated, pSmoothed] = genKFstationaryInference(observation,pObsGivenState,pStateGivenPrevious,p0);
+[pPredicted, pUpdated, pSmoothed] = genKFstationaryInference(observation,O,T,p0);
 %Visualize matrices:
-%figure; subplot(1,2,2); imagesc(pStateGivenPrevious); title('Transition'); ylabel('Next state'); xlabel('Curr state'); subplot(1,2,1); imagesc(pObsGivenState); title('Observation');  ylabel('Obs'); xlabel('State');
+figure; subplot(1,2,2); imagesc(T); title('Transition'); ylabel('Next state'); xlabel('Curr state'); subplot(1,2,1); imagesc(O); title('Observation');  ylabel('Obs'); xlabel('State');
 end
 
 function p=rowNormalize(p)
