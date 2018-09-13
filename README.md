@@ -1,7 +1,8 @@
 kalmanBased-eventDetection
 A threshold-free, preprocessing-free, fast Kalman filter-based gait event detection system. 
-It takes forces along the gravity axis for each individual leg, and estimates the stance/swing phases for each leg (and consequently the relevant gait events: toe-offs and heel-strikes).
-It does a (soft) enforcing of gait phase ordering in a cyclical manner: left swing, double-support 1, right swing, double support 2, left swing, ... and so on. The enforcing is soft to allow for some ill-conditioned cases when subjects start/stop walking.
+It takes forces along the gravity axis for each individual leg, and estimates the stance/swing phases for each leg (and consequently the relevant gait events: toe-offs and heel-strikes). It enforces gait phase ordering in a cyclical manner: left swing, double-support 1, right swing, double support 2, left swing, ... and so on. 
+
+The enforcing can be hard (no exceptions to cycle order) or soft (highly unlikely but not impossible exceptions). Soft enforcement can lead to slightly faster running times if accompanied by a sparse observation matrix (a sparse observation matrix is NOT recommended with hard enforcement: it may lead to ill-conditioned cases when subjects start/stop walking).
 
 #to do:
 Testing:

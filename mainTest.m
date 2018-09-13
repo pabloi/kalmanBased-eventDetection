@@ -7,7 +7,7 @@ load ./data/C02forcesAndEventsTrial06.mat
 %% Get force data from a single trial
 Lfz=forces06(:,strcmp(Flabels,'LFz'));
 Rfz=forces06(:,strcmp(Flabels,'RFz'));
-
+BW=median(Lfz+Rfz);
 %% Do the estimation
 % [pS,pU,pP,T,O]=kalmanStanceDetector(Lfz,Rfz); %This actually estimates the % Fz force being exerted by the left leg (as opposed to the right)
 % [~,MAPstate]=max(pS);
@@ -49,7 +49,7 @@ plot((MAPstate),'DisplayName','MAP estimate');
 
 %% Visualize aligned results
 % sumfun=@mean;
-% BW=median(Lfz+Rfz);
+
 % figure; 
 % p={pP',pU',pS'};
 % tl={'Predicted','Updated','Smoothed'};
@@ -215,5 +215,6 @@ sum(Rfz(swR{2}==1)~=0)
 sum(Lfz(swL{1}==0)==0)
 sum(Lfz(swL{2}==0)==0)
 sum(Rfz(swR{1}==0)==0)
-sum(Rfz(swR{2}==0)==0)
+sum(Rfz(swR{2}==0)==0) %This number may be high because there is a small swing phase at the end of the trial (after subject stopped). 
+%If cycle is hard-enforced, this is not detected, leading to apparent zero forces on a 'double support' phase
 

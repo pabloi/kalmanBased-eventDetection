@@ -33,7 +33,7 @@ L=tril(pStateGivenPrevious);
 T=nan(2*M-2);
 T(1:M,:)=[L(:,1:M-1),[L(end,1:M-1);zeros(M-1)]];
 T(M:end,:)=[[L(end,1:M-1);zeros(M-2,M-1);],L(1:M-1,1:M-1)];
-T(sub2ind(size(T),1:2*M-3,2:2*M-2))=1e-20; %Backward transition, unlikely but not impossible.
+%T(sub2ind(size(T),1:2*M-3,2:2*M-2))=1e-20; %This makes the backward transition unlikely but not impossible. Comment for hard enforcement of cycles
 T=sparse(T);
 T=columnNormalize(T);
 
@@ -41,9 +41,10 @@ T=columnNormalize(T);
 measNoiseSigma=.03;
 aux=[0:D-1]'/(D-1) - [0:M-1]/(M-1);
 pObsGivenState=exp(-(aux.^2)/(2*measNoiseSigma^2))/sqrt(2*pi*measNoiseSigma^2);
-%Sparsify:
-pObsGivenState(pObsGivenState<1e-5)=0;
-%pObsGivenState=sparse(pObsGivenState); 
+%Sparsify (optional):
+%pObsGivenState(pObsGivenState<1e-5)=0; %Reducing number of non-zero
+%entries improves speed slightly. However, this is not recommended if there
+%is hard-enforcement of the cycle, as it may lead to impossible state transitions. 
 
 pObsGivenState=columnNormalize(pObsGivenState);
 pp=.05; %Prob of observing non-zero force in the single-stance phase
@@ -51,7 +52,8 @@ pObsGivenState(:,1)=[1-pp;pp/3;pp/3;pp/3;zeros(D-4,1)];
 pObsGivenState(:,M)=[zeros(D-4,1);pp/3;pp/3;pp/3;1-pp];
 
 O=[pObsGivenState(:,1:M-1),fliplr(pObsGivenState(:,2:M))];
-%O=sparse(O); %If O is very sparse, this might be worth it, but not in general
+%O=sparse(O); %If O is VERY sparse, this might be worth it in terms of
+%speed, but probably not if O is more than 5% non-zero
 O=columnNormalize(O);
 
 p0=(ones(2*M-2,1)/(2*M-2));
