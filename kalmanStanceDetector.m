@@ -3,7 +3,7 @@ function [pSmoothed,pUpdated,pPredicted,pStateGivenPrevious,pObsGivenState]=kalm
 %estimation) to infer stance from force traces.
 
 M=101; %Number of points where we estimate the probability distribution in the interval [-1 1]
-D=99; %Number of points where we estimate the probability distribution of the output 
+D=99; %Number of points where we estimate the probability distribution of the output
 
 %HMM chain description:
 %The transition probability is: with probability=w we transition to a new
@@ -49,7 +49,7 @@ pObsGivenState(:,M)=[zeros(D-4,1);pp/3;pp/3;pp/3;1-pp];
 
 p0=ones(M,1)/M;
 observation=discretizeObs((force2-force1)./abs(force2+force1),D,[-1 1]);
-[pPredicted, pUpdated, pSmoothed] = genKFstationaryInference(observation,pObsGivenState,pStateGivenPrevious,p0);
+[pPredicted, pUpdated, pSmoothed] = HMMstationaryInference(observation,pObsGivenState,pStateGivenPrevious,p0);
 %Visualize matrices:
 %figure; subplot(1,2,2); imagesc(pStateGivenPrevious); title('Transition'); ylabel('Next state'); xlabel('Curr state'); subplot(1,2,1); imagesc(pObsGivenState); title('Observation');  ylabel('Obs'); xlabel('State');
 end

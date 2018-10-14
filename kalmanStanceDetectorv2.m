@@ -1,9 +1,9 @@
-function [pSmoothed,pUpdated,pPredicted,pStateGivenPrevious,pObsGivenState]=kalmanStanceDetectorv2(force1,force2)
+function [pSmoothed,pUpdated,pPredicted,pStateGivenPrevious,pObsGivenState,MAPsequence]=kalmanStanceDetectorv2(force1,force2)
 %This function implements a kalman-style filter (hidden markov chain state
 %estimation) to infer stance from force traces.
 
 M=51; %Number of points where we estimate the probability distribution in the interval [-1 1]
-D=101; %Number of points where we estimate the probability distribution of the output 
+D=101; %Number of points where we estimate the probability distribution of the output
 
 %HMM chain description:
 %The transition probability is: with probability=w we transition to a new
@@ -44,7 +44,7 @@ pObsGivenState=exp(-(aux.^2)/(2*measNoiseSigma^2))/sqrt(2*pi*measNoiseSigma^2);
 %Sparsify (optional):
 %pObsGivenState(pObsGivenState<1e-5)=0; %Reducing number of non-zero
 %entries improves speed slightly. However, this is not recommended if there
-%is hard-enforcement of the cycle, as it may lead to impossible state transitions. 
+%is hard-enforcement of the cycle, as it may lead to impossible state transitions.
 
 pObsGivenState=columnNormalize(pObsGivenState);
 pp=.05; %Prob of observing non-zero force in the single-stance phase
@@ -58,7 +58,8 @@ O=columnNormalize(O);
 
 p0=(ones(2*M-2,1)/(2*M-2));
 observation=discretizeObs((force2-force1)./abs(force2+force1),D,[-1 1]);
-[pPredicted, pUpdated, pSmoothed] = genKFstationaryInference(observation,O,T,p0);
+[pPredicted, pUpdated, pSmoothed] = HMMstationaryInference(observation,O,T,p0);
+[MAPsequence] = viterbi(observation,T,O,p0);
 %Visualize matrices:
 %figure; subplot(1,2,2); imagesc(T); title('Transition'); ylabel('Next state'); xlabel('Curr state'); subplot(1,2,1); imagesc(O); title('Observation');  ylabel('Obs'); xlabel('State');
 end

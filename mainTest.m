@@ -5,8 +5,9 @@ addpath(genpath('../matlab-sysID/')) %Change to wherever the matlab-linsys packa
 load ./data/C02forcesAndEventsTrial06.mat
 
 %% Get force data from a single trial
-Lfz=forces06(:,strcmp(Flabels,'LFz'));
-Rfz=forces06(:,strcmp(Flabels,'RFz'));
+Nsamp=size(forces06,1);
+Lfz=forces06(1:Nsamp,strcmp(Flabels,'LFz'));
+Rfz=forces06(1:Nsamp,strcmp(Flabels,'RFz'));
 BW=median(Lfz+Rfz);
 %% Do the estimation
 % [pS,pU,pP,T,O]=kalmanStanceDetector(Lfz,Rfz); %This actually estimates the % Fz force being exerted by the left leg (as opposed to the right)
@@ -15,13 +16,19 @@ BW=median(Lfz+Rfz);
 % swingL=MAPstate==0;
 % swingR=MAPstate==100;
 %% Alt estimation
-[pS,pU,pP,T,O]=kalmanStanceDetectorv2(Lfz,Rfz); %This actually estimates the % Fz force being exerted by the left leg (as opposed to the right)
+[pS,pU,pP,T,O,MAPsequence]=kalmanStanceDetectorv2(Lfz,Rfz); %This actually estimates the % Fz force being exerted by the left leg (as opposed to the right)
+MAPsequence=2*(MAPsequence-1);
+MAPsequence(MAPsequence>100)=200-MAPsequence(MAPsequence>100);
 [~,MAPstate]=max(pS);
 %[~,MAPstate]=max(pU);
 MAPstate=2*(MAPstate-1);
 MAPstate(MAPstate>100)=200-MAPstate(MAPstate>100);
 swingL=MAPstate==0;
 swingR=MAPstate==100;
+
+swingL=MAPsequence==0;
+swingR=MAPsequence==100;
+
 %% Try EM:
 %D=101;
 %M=size(pS,2);
@@ -32,25 +39,26 @@ swingR=MAPstate==100;
 % swingL=MAPstate==0;
 % swingR=MAPstate==100;
 %% Compute associated events: LHS, RHS, LTO, RTO
-eventsK=events06;
+eventsK=events06(1:Nsamp,:);
 eventsK(2:end,1)= ~swingL(2:end) & swingL(1:end-1); %LHS
 eventsK(2:end,2)= ~swingR(2:end) & swingR(1:end-1); %RHS
 eventsK(2:end,3)= swingL(2:end) & ~swingL(1:end-1); %LTO
 eventsK(2:end,4)= swingR(2:end) & ~swingR(1:end-1); %RTO
 %% Visualize results
-figure; 
+figure;
 p1=subplot(4,1,1); imagesc(pP); title('Predicted State')
 p2=subplot(4,1,2); imagesc(pU); title('Updated State')
 p3=subplot(4,1,3); imagesc(pS); title('Smoothed State')
-p4=subplot(4,1,4); hold on; plot((100*Lfz/BW),'DisplayName','% BW on left'); 
+p4=subplot(4,1,4); hold on; plot((100*Lfz/BW),'DisplayName','% BW on left');
 plot(100-(100*Rfz/BW),'DisplayName','100-%BW on right');
-plot((MAPstate),'DisplayName','MAP estimate'); 
- linkaxes([p1 p2 p3 p4],'xy'); axis([1 size(Lfz,1) 0 100]); legend
+plot((MAPstate),'DisplayName','MAP estimate');
+plot((MAPsequence),'DisplayName','MAP sequence');
+linkaxes([p1 p2 p3 p4],'xy'); axis([1 size(Lfz,1) 0 100]); legend
 
 %% Visualize aligned results
 % sumfun=@mean;
 
-% figure; 
+% figure;
 % p={pP',pU',pS'};
 % tl={'Predicted','Updated','Smoothed'};
 % ev=events06; %Use classic-detection events
@@ -67,18 +75,18 @@ plot((MAPstate),'DisplayName','MAP estimate');
 %     end
 %     end
 %     p1=subplot(4,4,i+12);     %j=4, plot the actual data:
-%     hold on; 
-%     l1=plot(100*sumfun(Lfz(aux),1)/BW,'DisplayName','% BW on left','LineWidth',2); 
+%     hold on;
+%     l1=plot(100*sumfun(Lfz(aux),1)/BW,'DisplayName','% BW on left','LineWidth',2);
 %     l2=plot(100-(100*sumfun(Rfz(aux),1)/BW),'DisplayName','100-%BW on right','LineWidth',2);
-%     l3=plot(((sumfun(MAPstate(aux),1))),'DisplayName','MAP estimate','LineWidth',2); 
+%     l3=plot(((sumfun(MAPstate(aux),1))),'DisplayName','MAP estimate','LineWidth',2);
 %     if mod(i,2)==1
-%     plot(100*(Lfz(aux))'/BW,'DisplayName','% BW on left','Color',l1.Color); 
+%     plot(100*(Lfz(aux))'/BW,'DisplayName','% BW on left','Color',l1.Color);
 %     axis([0 200 0 30])
 %     else
 %     plot(100-(100*(Rfz(aux))'/BW),'DisplayName','100-%BW on right','Color',l2.Color);
 %     axis([0 200 70 100])
 %     end
-%     plot((((MAPstate(aux)))'),'DisplayName','MAP estimate','Color',l3.Color); 
+%     plot((((MAPstate(aux)))'),'DisplayName','MAP estimate','Color',l3.Color);
 %     %TODO add some sense of dispersion to the plots
 %     set(p1,'XTick',[window(1),0:100:window(end)]-window(1)+1,'XTickLabel',{num2str(window(1)),Elabels{i}(end-2:end),'+100','+200'})
 %     grid on
@@ -98,14 +106,14 @@ sumfun=@mean;
 %dispfunD=@std;
 %dispfunU=@std;
 BW=median(Lfz+Rfz);
-figure; 
+figure;
 for j=1:2
     switch j
         case 1
-            ev=events06;
+            ev=events06(1:Nsamp,:);
             en='Classic';
         case 2
-            ev=eventsK;
+            ev=eventsK(1:Nsamp,:);
             en='Kalman';
     end
     window=[-900:900];
@@ -122,14 +130,16 @@ for j=1:2
                 case 3
                     data=MAPstate(LHS);
                     nn='MAP estimate';
+                    data=MAPsequence(LHS);
+                    nn='MAP sequence';
             end
             p1=subplot(3,4,i+(k-1)*4);     %j=4, plot the actual data:
-            hold on; 
+            hold on;
            l=plot(sumfun(data),'DisplayName',en,'LineWidth',2);
            patch([1:size(data,2),size(data,2):-1:1],[sumfun(data)+dispfunU2(data),fliplr(sumfun(data)-dispfunD2(data))],l.Color,'FaceAlpha',.1,'EdgeColor','none','DisplayName','90% CI (\pm 2 \sigma)')
            patch([1:size(data,2),size(data,2):-1:1],[sumfun(data)+dispfunU(data),fliplr(sumfun(data)-dispfunD(data))],l.Color,'FaceAlpha',.3,'EdgeColor','none','DisplayName','68% CI (\pm 1 \sigma)')
            if j==1
-              %plot(data','Color',l.Color) 
+              %plot(data','Color',l.Color)
            end
            if i==1
                ylabel(nn)
@@ -150,10 +160,10 @@ figure
 for j=1:2
     switch j
         case 1
-            ev=events06;
+            ev=events06(1:Nsamp,:);
             en='Classic';
         case 2
-            ev=eventsK;
+            ev=eventsK(1:Nsamp,:);
             en='Kalman';
     end
     LHS=find(ev(:,1)); %Starting and ending LHS
@@ -198,10 +208,10 @@ for j=1:2
 end
 
 %%  Print difference in forces during 'swing'
-ev=full(events06);
+ev=full(events06(1:Nsamp,:));
 swL{1}=cumsum(ev(:,3))-cumsum(ev(:,1));
 swR{1}=cumsum(ev(:,4))-cumsum(ev(:,2));
-ev=full(eventsK);
+ev=full(eventsK(1:Nsamp,:));
 swL{2}=swingL;
 swR{2}=swingR;
 
@@ -215,6 +225,5 @@ sum(Rfz(swR{2}==1)~=0)
 sum(Lfz(swL{1}==0)==0)
 sum(Lfz(swL{2}==0)==0)
 sum(Rfz(swR{1}==0)==0)
-sum(Rfz(swR{2}==0)==0) %This number may be high because there is a small swing phase at the end of the trial (after subject stopped). 
+sum(Rfz(swR{2}==0)==0) %This number may be high because there is a small swing phase at the end of the trial (after subject stopped).
 %If cycle is hard-enforced, this is not detected, leading to apparent zero forces on a 'double support' phase
-
